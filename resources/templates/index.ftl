@@ -5,12 +5,6 @@
 </head>
 <div class="table-responsive-xl">
     <table class="table">
-        <#--    <thead>-->
-        <#--    <tr>-->
-        <#--        <th scope="col"></th>-->
-        <#--        <th scope="col"></th>-->
-        <#--    </tr>-->
-        <#--    </thead>-->
         <tbody>
         <tr>
             <td>Updated</td>

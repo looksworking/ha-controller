@@ -2,11 +2,16 @@ package org.looksworking.ha.controller
 
 import com.google.gson.Gson
 import com.google.gson.JsonElement
+import freemarker.cache.ClassTemplateLoader
 import io.ktor.application.Application
 import io.ktor.application.call
+import io.ktor.application.install
+import io.ktor.freemarker.FreeMarker
+import io.ktor.freemarker.FreeMarkerContent
 import io.ktor.http.ContentType
 import io.ktor.network.selector.ActorSelectorManager
 import io.ktor.network.sockets.aSocket
+import io.ktor.response.respond
 import io.ktor.response.respondText
 import io.ktor.routing.get
 import io.ktor.routing.routing
@@ -14,32 +19,43 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.css.q
 import mu.KLogging
 import java.net.InetSocketAddress
 import java.nio.file.Paths
 import java.sql.Connection
 import java.sql.DriverManager
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.*
+import java.time.format.DateTimeFormatter
+
+
 
 fun Application.web() {
     routing {
+        install(FreeMarker) {
+            templateLoader = ClassTemplateLoader(this::class.java.classLoader, "templates")
+        }
         get("/") {
             val connection = Database.connection
             val query = "select id, data from data where unit='74c7d675-9402-4ef4-afdb-55b2bf0b960e' " +
                     "ORDER BY id DESC LIMIT 1; "
             val resultSet = connection.createStatement().executeQuery(query)
             if(resultSet.next()) {
-                val time = idToCalendar(resultSet.getLong("id")).time
+                val date = idToDate(resultSet.getLong("id"))
+                val formatter = DateTimeFormatter.ofPattern("HH:mm:ss / dd.MM.yyyy")
+                val formattedString = date.format(formatter)
                 val lastData = resultSet.getString("data")
                 val json = GsonSingleton.gson.fromJson(lastData, JsonElement::class.java).asJsonObject
-                call.respondText("Last on $time:\n" +
-                        "Temperature: ${json.getAsJsonPrimitive("temperature")}\n" +
-                        "Humidity: ${json.getAsJsonPrimitive("humidity")}", ContentType.Text.Plain)
+                call.respond((FreeMarkerContent("index.ftl",
+                    mapOf(
+                        "time" to formattedString,
+                        "temp" to json.getAsJsonPrimitive("temperature"),
+                        "hum" to json.getAsJsonPrimitive("humidity")), "")))
             } else {
                 call.respondText("No data", ContentType.Text.Plain)
             }
-
         }
     }
 }
@@ -120,10 +136,10 @@ fun generateId(): String {
     return id.toString()
 }
 
-fun idToCalendar(id: Long): Calendar {
+fun idToDate(id: Long): ZonedDateTime {
     val delta = id shr(23)
     val date = 1554350400000 + delta
-    val calendar = Calendar.getInstance()
-    calendar.setTimeInMillis(date)
-    return calendar
+    val zonedDateTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(date),
+        ZoneId.of("GMT+3")) // TODO
+    return zonedDateTime
 }

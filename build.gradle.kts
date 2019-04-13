@@ -8,13 +8,15 @@ val logback_version: String by project
 plugins {
     application
     kotlin("jvm") version "1.3.21"
+    id("com.palantir.docker") version "0.22.0"
 }
 
 group = "org.looksworking.ha-controller"
 version = "0.0.1"
 
 application {
-    mainClassName = "io.ktor.server.netty.EngineMain"
+    applicationName = "ha-controller"
+    mainClassName = "org.looksworking.ha.controller.AppKt"
 }
 
 repositories {
@@ -35,6 +37,8 @@ dependencies {
     compile("io.ktor:ktor-client-core:$ktor_version")
     compile("io.ktor:ktor-client-core-jvm:$ktor_version")
     compile("io.github.microutils:kotlin-logging:1.6.24")
+    compile("io.ktor:ktor-gson:$ktor_version")
+    compile("org.xerial:sqlite-jdbc:3.27.2.1")
     testCompile("io.ktor:ktor-server-tests:$ktor_version")
 }
 
@@ -43,3 +47,16 @@ kotlin.sourceSets["test"].kotlin.srcDirs("test")
 
 sourceSets["main"].resources.srcDirs("resources")
 sourceSets["test"].resources.srcDirs("testresources")
+
+docker {
+    name = "htpc.lan:5000/${application.applicationName}:${project.version}"
+    files(tasks.findByName("distTar")?.outputs)
+    buildArgs(
+        mapOf(
+            "APP_NAME" to application.applicationName,
+            "DIST_TAR" to "${application.applicationName}-${project.version}"
+        )
+    )
+    files(tasks.findByName("distTar")?.outputs)
+    pull(true)
+}
